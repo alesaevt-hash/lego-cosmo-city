@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LEGO Cosmo City — Склад</title>
+<style>
+:root{font-family:Arial,sans-serif;color:#202938;background:#f3f5f8}
+*{box-sizing:border-box}
+body{margin:0}
+header{background:#18263c;color:white;padding:22px max(16px,calc((100% - 1100px)/2))}
+header h1{margin:0 0 6px;font-size:25px}
+header p{margin:0;color:#cbd5e1}
+main{max-width:1100px;margin:auto;padding:18px}
+nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+button,.tab{border:0;border-radius:10px;padding:11px 14px;cursor:pointer;font-weight:600;background:#e1e7ef;color:#253247}
+button.active,.primary{background:#2563eb;color:white}
+.panel{background:white;border-radius:15px;padding:17px;margin-bottom:16px;box-shadow:0 2px 9px #1720330c}
+input,textarea,select{font:inherit;width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:9px;margin:6px 0 12px}
+label{font-size:14px;font-weight:600}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.stat{background:white;border-radius:12px;padding:15px}
+.stat strong{display:block;font-size:23px;margin-bottom:5px}
+.muted{color:#64748b;font-size:13px}
+.item{padding:13px 0;border-bottom:1px solid #e8edf3}
+.item:last-child{border:0}
+.item strong{display:block;margin-bottom:5px}
+.code{font-family:monospace;color:#2563eb;font-size:14px}
+.warning{color:#b45309;background:#fff7ed;padding:8px;border-radius:8px;margin-top:7px;font-size:13px}
+.hidden{display:none}
+footer{text-align:center;color:#64748b;padding:20px;font-size:12px}
+@media(max-width:550px){.stats{grid-template-columns:1fr 1fr}header h1{font-size:21px}main{padding:12px}}
+</style>
+</head>
+<body>
+<header>
+<h1>🧱 LEGO Cosmo City</h1>
+<p>Система складского учёта</p>
+</header>
+<main>
+<div class="stats">
+ <div class="stat"><strong id="total">0</strong><span class="muted">Записей каталога</span></div>
+ <div class="stat"><strong id="unique">0</strong><span class="muted">Уникальных кодов</span></div>
+ <div class="stat"><strong id="duplicates">0</strong><span class="muted">Повторных записей</span></div>
+</div>
+<nav>
+<button class="tab active" data-page="catalog">Каталог</button>
+<button class="tab" data-page="scan">Сканирование</button>
+<button class="tab" data-page="docs">Операции</button>
+</nav>
+
+<section id="catalog" class="page">
+<div class="panel">
+<h2>Поиск товара</h2>
+<input id="search" placeholder="Штрихкод или название товара">
+<p class="muted">Подключи сканер или введи код вручную. Многие сканеры отправляют код при нажатии Enter.</p>
+<div id="results"></div>
+</div>
+</section>
+
+<section id="scan" class="page hidden">
+<div class="panel">
+<h2>Сканирование штрихкода</h2>
+<label for="barcode">Штрихкод</label>
+<input id="barcode" inputmode="numeric" placeholder="Отсканируй или введи код">
+<button class="primary" id="findBtn">Найти товар</button>
+<div id="scanResult"></div>
+</div>
+</section>
+
+<section id="docs" class="page hidden">
+<div class="panel">
+<h2>Журнал операций на этом устройстве</h2>
+<p class="muted">Пока записи сохраняются только в браузере этого устройства. Для общей базы на iPhone и компьютере понадобится подключить облачное хранилище.</p>
+<label for="opType">Тип операции</label>
+<select id="opType">
+<option>Приёмка</option><option>Отправка</option><option>Инвентаризация</option>
+</select>
+<label for="opCode">Штрихкод</label>
+<input id="opCode" placeholder="Штрихкод товара">
+<label for="opNote">Примечание / упаковка</label>
+<input id="opNote" placeholder="Например: коробка, маленький пакетик">
+<button class="primary" id="saveOp">Записать операцию</button>
+<div id="opMessage"></div>
+</div>
+<div class="panel">
+<h3>Последние операции</h3>
+<div id="operations"></div>
+<button id="clearOps">Очистить журнал на этом устройстве</button>
+</div>
+</section>
+</main>
+<footer>LEGO Cosmo City · Каталог склада</footer>
+
+<script>
+const products = [
+["68785864","Код Тихона ОЧЕНЬ ВАЖНО"],
+["12345670","Мелоч ящ. 1"],
+["12345687","Мусор 1"],
+["12345694","Интересное для ролю игр."],
+["12345700","Метро"],
+["12345717","Быв. мир юр. пер."],
+["12345724","Мусор 2"],
+["12345731","Мусор 3"],
+["12345748","Много дет для само"],
+["12345755","Много дет для само"],
+["12345762","Мусор 4"],
+["12345779","Кониейнер с лего в 1 ящ."],
+["12345786","Часть дома юркского периода"],
+["12345793","Муслор 5"],
+["12345816","Часть пол. участка и пож. станции"],
+["12345809","Ящик №1 эт. №1"],
+["12345816","Ящик №2 эт. №1"],
+["12345823","Мусор 6"],
+["12345830","Комбо мелочь №1"],
+["12345847","Ящик №3 эт. №1"],
+["12345854","Ящик №4 эт. №1"],
+["12345861","Ящик №5 эт. №1"],
+["12345878","Мусор 7"],
+["12345885","Мелочевка №1 ( тела и т.д)"],
+["12345892","Мусор 8"],
+["12345908","Мусор 9"],
+["12345915","Ящик №1 эт. №2"],
+["12345922","\\Ящик №2 эт. №2"],
+["12345939","Ящик №3 эт. №2"],
+["12345946","Ящик №4 эт. №2"],
+["12345953","Ящик №5 эт. №2"],
+["12345960","Комбо мелочь №2"],
+["12345977","Лего оружие к Контейнеру номер 12346332"],
+["12345984","Мелочевка №2 (тела и т.д.)"],
+["12345991","Мелочевка №3 ( тела и т.д.)"],
+["12346011","Часть дома юркского периода"],
+["12346028","Часть дома юркского периода"],
+["12346035","Мусор №10"],
+["12346042","Мусор №11"],
+["12346059","Бывший автотрак пол."],
+["12346066","Железная дорога"],
+["12346073","Тела и т.д."],
+["12346103","Предпоследняя игра"],
+["12346110","Послежняя игра"],
+["12346127","Предпоследняя игра"],
+["12346134","Мусор"],
+["12346141","Комбо мелочь №3"],
+["12346158","Комбо мелочи №1 в мешке"],
+["12346165","Мусор №12"],
+["12346172","Мусор №13"],
+["12346189","Мусор №14"],
+["12346196","Много дет для само"],
+["12346202","Мусор №15"],
+["12346219","Крмбо мелочи №2 в мешке"],
+["12346226","Много дет для само"],
+["12346233","Комбо мелочь №4"],
+["12346240","Мусор №16"],
+["12346257","Мусор №16"],
+["12346264","Комбо мелочь №3 в мешке"],
+["12346271","Мусор №17"],
+["12346288","Комбо мелочи №2"],
+["12346295","Мусор №18"],
+["12346301","Много дет для само"],
+["12346318","Контейнер (Балкона)"],
+["12346332","Важный контейнер с мелочами"],
+["12346325","Контейнер со всякой всячиной"],
+["12346349","Мелочь как аксесы"],
+["12346356","Мелочь как аксесы для лего чел."],
+["12346363","Мелочь дет. для само. акс."],
+["12346370","Мелочь для акс. чел."],
+["12346387","Мусор №19"],
+["12346394","Мусор №20"],
+["12346400","Мусор №21"],
+["12346417","Мусор №22"],
+["12346424","Платформы"],
+["12346431","Мусор №23"],
+["12346448","Часть автобуса и вендинговые апараты"],
+["12346462","последняя игра"],
+["12346479","Мусор №24"],
+["12346486","Мелочь"],
+["12346493","Мусор №25"],
+["12346509","Мусор №25"],
+["12346516","Маленькое оружие использовавшаяся недавно в сцене"],
+["12346523","Человечки недавно использовавшиеся в последней сцене"],
+["12346530","Игра от 10.07.2026"],
+["12346547","Мусор №26"],
+["12346578","Лего в Усть каменогорск"],
+["12346585","Телефон и другие ЭЛЕКТРОННЫЕ вещи"],
+["12346592","Комбо мусор на разборку"],
+["12346608","Последняя игра"],
+["12346615","Мелочь квадратные и прямоугольные"],
+["12346622","Оружие длинное"],
+["12346639","Ящики с человечками ии их комплектующими"],
+["12346646","Лего Блоки и кирпичи"],
+["12346653","Лего пистолеты и т.д."],
+["12346660","Комплектующие к лего метро"],
+["12346677","В Усть Каменогорск"],
+["12346684","Мусор №27"],
+["12346691","ЛЕГО КОСТИ"],
+["12346707","Вагоны метро"],
+["12346714","Лего транспорт"],
+["12346738","Лего колбы"],
+["12346745","Лего бутылки"],
+["12346752","Легот на разборку и сортировку"],
+["12346769","кучв мелочевки"],
+["12346776","Лего кубки и стаканы"],
+["12346783","Разобрать по местам (разложить)"],
+["12346875","Потом разберусь"],
+["12346677","В Грузию"],
+["12346851","Не успел разфосовать"],
+["12346844","Мусор №28"],
+["12346837","Мусор №29"],
+["12346820","Мусор №30"],
+["12346813","Мусор № 31"],
+["12346806","Мусор №32"],
+["12346790","Мусор №33"],
+["12346974","Мелочевка"],
+["12346967","Мусор №34"],
+["12346882","Мелочевка 0"],
+["12346899","Световые блоки КОД ТИХОНА"],
+["12346905","Интструкция к мал. мусор."],
+["12346912","Инструкция к камахзу"],
+["12346929","Мусооовоз инструкция"],
+["12346950","Канцтовары стола"],
+["12346981","Последняя игра 1"],
+["12346998","НАДО СОБРАТЬ"],
+["12347001","Мелочь на само. и на аксесы"],
+["12347018","Играл 26.09.26"],
+["12347025","Игра"]
+];
+
+const $ = id => document.getElementById(id);
+const grouped = new Map();
+products.forEach((p,i)=>{
+  if(!grouped.has(p[0])) grouped.set(p[0],[]);
+  grouped.get(p[0]).push({...{code:p[0],name:p[1],index:i}});
+});
+$("total").textContent = products.length;
+$("unique").textContent = grouped.size;
+$("duplicates").textContent = products.length - grouped.size;
+
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function render(list,target){
+  if(!list.length){target.innerHTML='<p class="muted">Ничего не найдено.</p>';return;}
+  target.innerHTML=list.map(p=>{
+    const dup=grouped.get(p.code).length>1;
+    return `<div class="item"><strong>${esc(p.name)}</strong>
+    <div class="code">${esc(p.code)}</div>
+    ${dup?'<div class="warning">Внимание: этот штрихкод связан с несколькими товарами.</div>':''}
+    </div>`;
+  }).join('');
+}
+function search(){
+  const q=$("search").value.trim().toLowerCase();
+  const list=products.map((p,index)=>({code:p[0],name:p[1],index}))
+   .filter(p=>!q||p.code.includes(q)||p.name.toLowerCase().includes(q));
+  render(list,$("results"));
+}
+$("search").addEventListener("input",search);
+search();
+
+function findCode(code,target){
+  code=code.trim();
+  if(!code){target.innerHTML='<p class="warning">Введи штрихкод.</p>';return;}
+  const found=products.map((p,index)=>({code:p[0],name:p[1],index})).filter(p=>p.code===code);
+  if(!found.length){target.innerHTML='<p class="warning">Штрихкод не найден в каталоге.</p>';return;}
+  render(found,target);
+}
+$("findBtn").addEventListener("click",()=>findCode($("barcode").value,$("scanResult")));
+$("barcode").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();findCode($("barcode").value,$("scanResult"));}});
+document.querySelectorAll(".tab").forEach(btn=>btn.addEventListener("click",()=>{
+  document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b===btn));
+  document.querySelectorAll(".page").forEach(p=>p.classList.toggle("hidden",p.id!==btn.dataset.page));
+  if(btn.dataset.page==="scan") $("barcode").focus();
+  if(btn.dataset.page==="docs") showOps();
+}));
+
+function getOps(){try{return JSON.parse(localStorage.getItem("legoCosmoOps")||"[]")}catch(e){return []}}
+function showOps(){
+ const ops=getOps();
+ $("operations").innerHTML=ops.length?ops.slice().reverse().map(o=>`<div class="item"><strong>${esc(o.type)} — ${esc(o.code)}</strong><div>${esc(o.note||"Без примечания")}</div><div class="muted">${esc(o.date)}</div></div>`).join(""):'<p class="muted">Операций пока нет.</p>';
+}
+$("saveOp").addEventListener("click",()=>{
+ const code=$("opCode").value.trim();
+ if(!code){$("opMessage").innerHTML='<p class="warning">Введи штрихкод.</p>';return;}
+ const ops=getOps();
+ ops.push({type:$("opType").value,code,note:$("opNote").value.trim(),date:new Date().toLocaleString("ru-RU")});
+ localStorage.setItem("legoCosmoOps",JSON.stringify(ops));
+ $("opMessage").textContent="Операция записана в браузере этого устройства.";
+ $("opCode").value="";$("opNote").value="";showOps();
+});
+$("clearOps").addEventListener("click",()=>{
+ if(confirm("Удалить локальный журнал операций?")){
+ localStorage.removeItem("legoCosmoOps");showOps();
+ }
+});
+showOps();
+</script>
+</body>
+</html>
